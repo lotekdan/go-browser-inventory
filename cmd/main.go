@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -90,8 +91,8 @@ func NewBrowserInventory() *BrowserInventory {
 	}
 }
 
-// GetExtensions retrieves all browser extensions
-func (bi *BrowserInventory) GetExtensions() ([]Extension, error) {
+// GetExtensions retrieves extensions based on browser selection
+func (bi *BrowserInventory) GetExtensions(selectedBrowser string) ([]Extension, error) {
 	var allExtensions []Extension
 
 	homeDir, err := os.UserHomeDir()
@@ -100,6 +101,11 @@ func (bi *BrowserInventory) GetExtensions() ([]Extension, error) {
 	}
 
 	for _, config := range bi.configs {
+		// Skip if a specific browser is selected and it doesn't match
+		if selectedBrowser != "" && strings.ToLower(config.Name) != strings.ToLower(selectedBrowser) {
+			continue
+		}
+
 		var basePath string
 		switch runtime.GOOS {
 		case "windows":
@@ -240,11 +246,31 @@ func (bi *BrowserInventory) getFirefoxExtensions(basePath string, config Browser
 }
 
 func main() {
+	// Define command-line flag
+	browserPtr := flag.String("browser", "", "Specify a browser to scan (chrome, edge, firefox). Leave empty for all.")
+	flag.Parse()
+
+	// Validate browser selection
+	selectedBrowser := *browserPtr
+	if selectedBrowser != "" {
+		validBrowsers := map[string]bool{
+			"chrome":  true,
+			"edge":    true,
+			"firefox": true,
+		}
+		if !validBrowsers[strings.ToLower(selectedBrowser)] {
+			fmt.Printf("Error: Invalid browser '%s'. Use 'chrome', 'edge', or 'firefox'.\n", selectedBrowser)
+			fmt.Println("Usage:")
+			flag.PrintDefaults()
+			os.Exit(1)
+		}
+	}
+
 	inventory := NewBrowserInventory()
-	extensions, err := inventory.GetExtensions()
+	extensions, err := inventory.GetExtensions(selectedBrowser)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	output := InventoryOutput{
@@ -255,7 +281,7 @@ func main() {
 	jsonData, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		fmt.Printf("Error marshaling to JSON: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	fmt.Println(string(jsonData))
