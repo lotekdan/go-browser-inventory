@@ -1,4 +1,4 @@
-package main
+package browsers
 
 import (
 	"encoding/json"

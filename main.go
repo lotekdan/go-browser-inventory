@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"go-browser-inventory/internal/browsers"
 )
 
 func main() {
@@ -45,7 +47,7 @@ func main() {
 		}
 	}
 
-	inventory := NewBrowserInventory()
+	inventory := browsers.NewBrowserInventory()
 	extensions, err := inventory.GetExtensions(selectedBrowser, *debugPtr)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -53,7 +55,7 @@ func main() {
 	}
 
 	if *jsonPtr {
-		output := InventoryOutput{
+		output := browsers.InventoryOutput{
 			Extensions: extensions,
 			Total:      len(extensions),
 		}
@@ -69,7 +71,7 @@ func main() {
 }
 
 // printConsoleFriendly prints extensions in a human-readable format
-func printConsoleFriendly(extensions []Extension) {
+func printConsoleFriendly(extensions []browsers.Extension) {
 	if len(extensions) == 0 {
 		fmt.Println("No extensions found.")
 		return

@@ -1,4 +1,4 @@
-package main
+package browsers
 
 // Extension represents a browser extension
 type Extension struct {
