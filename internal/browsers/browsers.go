@@ -43,7 +43,7 @@ func NewBrowserInventory() *BrowserInventory {
 			{
 				Name: "Firefox",
 				WindowsPath: []string{
-					"AppData", "Roaming", "Mozilla", "Firefox", "Profiles",
+					"AppData", "Roaming", "Mozilla", "Firefox", // Removed "Profiles"
 				},
 				MacOSPath: []string{
 					"Library", "Application Support", "Firefox", "Profiles",
