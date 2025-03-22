@@ -173,3 +173,4 @@ Feel free to open issues for bugs or feature requests!
 
 ## License
 This project is unlicensed (public domain) unless specified otherwise. Use it as you see fit!
+Prompt engineering experiment, so if it's useful to you you're welcome to it.
