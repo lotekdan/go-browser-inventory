@@ -1,4 +1,3 @@
-```markdown
 # Go Browser Inventory
 
 `go-browser-inventory` is a command-line tool written in Go that scans and lists browser extensions for Chrome, Edge, and Firefox. It provides output in either a human-readable console format or JSON, making it suitable for both interactive use and scripting.
