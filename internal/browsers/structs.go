@@ -7,6 +7,7 @@ type Extension struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
 	Browser string `json:"browser"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // BrowserConfig defines browser-specific configuration

@@ -5,87 +5,58 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"go-browser-inventory/internal/browsers"
 )
 
-func main() {
-	browserPtr := flag.String("browser", "", "Specify a browser to scan (chrome, edge, firefox). Leave empty for all.")
-	helpPtr := flag.Bool("help", false, "Display help information")
-	debugPtr := flag.Bool("debug", false, "Enable debug output")
-	jsonPtr := flag.Bool("json", false, "Output in JSON format (default is console-friendly)")
+type output struct {
+	Extensions []browsers.Extension `json:"extensions"`
+	Total      int                  `json:"total"`
+}
 
+func main() {
+	browser := flag.String("browser", "", "Browser to list extensions for (Chrome, Edge, Firefox)")
+	jsonOutput := flag.Bool("json", false, "Output in JSON format")
+	debug := flag.Bool("debug", false, "Enable debug output")
 	flag.Parse()
 
-	if *helpPtr {
-		fmt.Println("Browser Extension Inventory Utility")
-		fmt.Println("==================================")
-		fmt.Println("This utility scans for browser extensions and outputs them in either JSON or console-friendly format.")
-		fmt.Println("\nUsage:")
-		flag.PrintDefaults()
-		fmt.Println("\nExamples:")
-		fmt.Println("  Scan all (console): go run .")
-		fmt.Println("  Scan Chrome (JSON): go run . -browser chrome -json")
-		fmt.Println("  Enable debug:       go run . -debug")
-		fmt.Println("  Show help:          go run . -help")
-		os.Exit(0)
-	}
-
-	selectedBrowser := *browserPtr
-	if selectedBrowser != "" {
-		validBrowsers := map[string]bool{
-			"chrome":  true,
-			"edge":    true,
-			"firefox": true,
-		}
-		if !validBrowsers[strings.ToLower(selectedBrowser)] {
-			fmt.Printf("Error: Invalid browser '%s'. Use 'chrome', 'edge', or 'firefox'.\n", selectedBrowser)
-			fmt.Println("Usage:")
-			flag.PrintDefaults()
-			os.Exit(1)
-		}
-	}
-
-	inventory := browsers.NewBrowserInventory()
-	extensions, err := inventory.GetExtensions(selectedBrowser, *debugPtr)
+	bi := browsers.NewBrowserInventory()
+	extensions, err := bi.GetExtensions(*browser, *debug)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if *jsonPtr {
-		output := browsers.InventoryOutput{
+	if *jsonOutput {
+		out := output{
 			Extensions: extensions,
 			Total:      len(extensions),
 		}
-		jsonData, err := json.MarshalIndent(output, "", "  ")
+		jsonData, err := json.MarshalIndent(out, "", "  ")
 		if err != nil {
-			fmt.Printf("Error marshaling to JSON: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error marshalling JSON: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		printConsoleFriendly(extensions)
-	}
-}
+		if len(extensions) == 0 {
+			fmt.Println("No extensions found.")
+			return
+		}
 
-// printConsoleFriendly prints extensions in a human-readable format
-func printConsoleFriendly(extensions []browsers.Extension) {
-	if len(extensions) == 0 {
-		fmt.Println("No extensions found.")
-		return
+		fmt.Println("Browser Extensions:")
+		fmt.Println("===================")
+		for i, ext := range extensions {
+			fmt.Printf("%d. %s\n", i+1, ext.Name)
+			fmt.Printf("   Browser: %s\n", ext.Browser)
+			fmt.Printf("   Version: %s\n", ext.Version)
+			fmt.Printf("   ID: %s\n", ext.ID)
+			fmt.Printf("   Enabled: %v\n", ext.Enabled)
+			if ext.Profile != "" { // Add Profile to output
+				fmt.Printf("   Profile: %s\n", ext.Profile)
+			}
+			fmt.Println("------------------")
+		}
+		fmt.Printf("Total extensions: %d\n", len(extensions))
 	}
-
-	fmt.Println("Browser Extensions:")
-	fmt.Println("==================")
-	for i, ext := range extensions {
-		fmt.Printf("%d. %s\n", i+1, ext.Name)
-		fmt.Printf("   Browser: %s\n", ext.Browser)
-		fmt.Printf("   Version: %s\n", ext.Version)
-		fmt.Printf("   ID: %s\n", ext.ID)
-		fmt.Printf("   Enabled: %v\n", ext.Enabled)
-		fmt.Println("------------------")
-	}
-	fmt.Printf("Total extensions: %d\n", len(extensions))
 }
