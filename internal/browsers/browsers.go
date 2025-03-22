@@ -1,9 +1,11 @@
 package browsers
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 )
@@ -43,7 +45,7 @@ func NewBrowserInventory() *BrowserInventory {
 			{
 				Name: "Firefox",
 				WindowsPath: []string{
-					"AppData", "Roaming", "Mozilla", "Firefox", // Removed "Profiles"
+					"AppData", "Roaming", "Mozilla", "Firefox",
 				},
 				MacOSPath: []string{
 					"Library", "Application Support", "Firefox", "Profiles",
@@ -101,4 +103,116 @@ func (bi *BrowserInventory) GetExtensions(selectedBrowser string, debug bool) ([
 	}
 
 	return allExtensions, nil
+}
+
+// resolveMessage handles __MSG_ placeholders for extension names
+// resolveMessage handles __MSG_ placeholders for extension names
+func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
+	msgKey := strings.TrimPrefix(msg, "__MSG_")
+	msgKey = strings.TrimSuffix(msgKey, "__")
+	lookupKey := strings.ToLower(msgKey)
+	localesPath := filepath.Join(basePath, "_locales")
+	if debug {
+		fmt.Printf("Debug: Resolving %s, lookupKey: %s, basePath: %s\n", msgKey, lookupKey, basePath)
+	}
+
+	if _, err := os.Stat(localesPath); os.IsNotExist(err) {
+		if debug {
+			fmt.Printf("Note: No _locales directory found at %s for %s\n", localesPath, msgKey)
+		}
+		return msgKey
+	}
+
+	localeDirs, err := os.ReadDir(localesPath)
+	if err != nil {
+		if debug {
+			fmt.Printf("Warning: Failed to read _locales directory %s: %v\n", localesPath, err)
+		}
+		return msgKey
+	}
+
+	// Try default_locale
+	if defaultLocale != "" {
+		messagesPath := filepath.Join(localesPath, defaultLocale, "messages.json")
+		if data, err := os.ReadFile(messagesPath); err == nil {
+			var messages map[string]struct {
+				Message string `json:"message"`
+			}
+			if err := json.Unmarshal(data, &messages); err == nil {
+				if debug {
+					fmt.Printf("Debug: Parsed %s, keys: %v\n", messagesPath, reflect.ValueOf(messages).MapKeys())
+					fmt.Printf("Debug: Checking for key %s in map: %v\n", lookupKey, messages)
+				}
+				if val, ok := messages[lookupKey]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s (default locale)\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				} else if debug {
+					fmt.Printf("Note: Key %s (lookup: %s) not found in %s (default locale)\n", msgKey, lookupKey, messagesPath)
+				}
+			} else if debug {
+				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
+			}
+		} else if debug {
+			fmt.Printf("Note: Failed to read %s: %v\n", messagesPath, err)
+		}
+	}
+
+	// Try English locales
+	for _, enLocale := range []string{"en", "en_US"} {
+		if enLocale == defaultLocale {
+			continue
+		}
+		messagesPath := filepath.Join(localesPath, enLocale, "messages.json")
+		if data, err := os.ReadFile(messagesPath); err == nil {
+			var messages map[string]struct {
+				Message string `json:"message"`
+			}
+			if err := json.Unmarshal(data, &messages); err == nil {
+				if debug {
+					fmt.Printf("Debug: Parsed %s, keys: %v\n", messagesPath, reflect.ValueOf(messages).MapKeys())
+					fmt.Printf("Debug: Checking for key %s in map: %v\n", lookupKey, messages)
+				}
+				if val, ok := messages[lookupKey]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s (English fallback)\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				} else if debug {
+					fmt.Printf("Note: Key %s (lookup: %s) not found in %s (English fallback)\n", msgKey, lookupKey, messagesPath)
+				}
+			} else if debug {
+				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
+			}
+		} else if debug {
+			fmt.Printf("Note: English fallback file %s not found for %s\n", messagesPath, msgKey)
+		}
+	}
+
+	// Fallback to other locales
+	for _, dir := range localeDirs {
+		if !dir.IsDir() || dir.Name() == defaultLocale || dir.Name() == "en" || dir.Name() == "en_US" {
+			continue
+		}
+		messagesPath := filepath.Join(localesPath, dir.Name(), "messages.json")
+		if data, err := os.ReadFile(messagesPath); err == nil {
+			var messages map[string]struct {
+				Message string `json:"message"`
+			}
+			if err := json.Unmarshal(data, &messages); err == nil {
+				if val, ok := messages[lookupKey]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				}
+			}
+		}
+	}
+
+	if debug {
+		fmt.Printf("Note: No matching message found for %s (lookup: %s) in %s\n", msgKey, lookupKey, localesPath)
+	}
+	return msgKey
 }

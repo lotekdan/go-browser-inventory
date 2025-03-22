@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// getChromiumExtensions handles Chromium-based browser extensions (Chrome, Edge)
 func (bi *BrowserInventory) getChromiumExtensions(basePath string, config BrowserConfig, debug bool) ([]Extension, error) {
 	profileBase := filepath.Dir(basePath)
 	if _, err := os.Stat(profileBase); os.IsNotExist(err) {
@@ -16,7 +15,7 @@ func (bi *BrowserInventory) getChromiumExtensions(basePath string, config Browse
 	}
 
 	profileNames := make(map[string]string)
-	localStatePath := filepath.Join(filepath.Dir(profileBase), "Local State")
+	localStatePath := filepath.Join(profileBase, "Local State")
 	if data, err := os.ReadFile(localStatePath); err == nil {
 		var localState struct {
 			Profile struct {
@@ -138,89 +137,4 @@ func (bi *BrowserInventory) getChromiumExtensions(basePath string, config Browse
 	}
 
 	return allExtensions, nil
-}
-
-// resolveMessage handles __MSG_ placeholders in Chromium manifest names
-func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
-	msgKey := strings.TrimPrefix(msg, "__MSG_")
-	msgKey = strings.TrimSuffix(msgKey, "__")
-	lookupKey := strings.ToLower(msgKey) // Normalize to lowercase
-	localesPath := filepath.Join(basePath, "_locales")
-	if _, err := os.Stat(localesPath); os.IsNotExist(err) {
-		if debug {
-			fmt.Printf("Note: No _locales directory found at %s for %s\n", localesPath, msgKey)
-		}
-		return msgKey
-	}
-
-	localeDirs, err := os.ReadDir(localesPath)
-	if err != nil {
-		if debug {
-			fmt.Printf("Warning: Failed to read _locales directory %s: %v\n", localesPath, err)
-		}
-		return msgKey
-	}
-
-	// Prioritize default_locale
-	if defaultLocale != "" {
-		messagesPath := filepath.Join(localesPath, defaultLocale, "messages.json")
-		if data, err := os.ReadFile(messagesPath); err == nil {
-			var messages map[string]struct {
-				Message string `json:"message"`
-			}
-			if err := json.Unmarshal(data, &messages); err == nil {
-				if val, ok := messages[lookupKey]; ok {
-					if debug {
-						fmt.Printf("Resolved %s to %s from %s (default locale)\n", msgKey, val.Message, messagesPath)
-					}
-					return val.Message
-				} else if debug {
-					fmt.Printf("Note: Key %s (lookup: %s) not found in %s (default locale)\n", msgKey, lookupKey, messagesPath)
-				}
-			} else if debug {
-				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
-			}
-		} else if debug {
-			fmt.Printf("Note: Failed to read %s: %v\n", messagesPath, err)
-		}
-	}
-
-	// Fallback to other locales
-	for _, dir := range localeDirs {
-		if !dir.IsDir() || dir.Name() == defaultLocale {
-			continue
-		}
-		messagesPath := filepath.Join(localesPath, dir.Name(), "messages.json")
-		data, err := os.ReadFile(messagesPath)
-		if err != nil {
-			if debug {
-				fmt.Printf("Note: Failed to read %s: %v\n", messagesPath, err)
-			}
-			continue
-		}
-
-		var messages map[string]struct {
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(data, &messages); err != nil {
-			if debug {
-				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
-			}
-			continue
-		}
-
-		if val, ok := messages[lookupKey]; ok {
-			if debug {
-				fmt.Printf("Resolved %s to %s from %s\n", msgKey, val.Message, messagesPath)
-			}
-			return val.Message
-		} else if debug {
-			fmt.Printf("Note: Key %s (lookup: %s) not found in %s\n", msgKey, lookupKey, messagesPath)
-		}
-	}
-
-	if debug {
-		fmt.Printf("Note: No matching message found for %s (lookup: %s) in %s\n", msgKey, lookupKey, localesPath)
-	}
-	return msgKey
 }
