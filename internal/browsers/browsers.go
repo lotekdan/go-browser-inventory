@@ -95,7 +95,9 @@ func (bi *BrowserInventory) GetExtensions(selectedBrowser string, debug bool) ([
 			exts, err = bi.getChromiumExtensions(basePath, config, debug)
 		}
 		if err != nil {
-			fmt.Printf("Warning: Failed to get %s extensions: %v\n", config.Name, err)
+			if debug {
+				fmt.Printf("Warning: Failed to get %s extensions: %v\n", config.Name, err)
+			}
 			continue
 		}
 		allExtensions = append(allExtensions, exts...)

@@ -12,6 +12,8 @@
 ## Prerequisites
 - [Go](https://golang.org/dl/) 1.24 or later installed
 - One or more supported browsers (Chrome, Edge, Firefox) installed with extensions
+- A C compiler (e.g., `gcc` via MinGW on Windows) for SQLite (`mattn/go-sqlite3`). Supported browsers installed with detectable extension directories.
+
 
 ## Installation
 1. **Clone or Download the Repository**:
@@ -23,9 +25,14 @@
    Otherwise, download and extract the source to a directory named `go-browser-inventory`.
 
 2. **Build the Binary**:
+   Make sure `gcc` is set in your path.
+   
    From the project root:
-    
-    go build -o go-browser-inventory
+  
+   Windows:
+    ```$env:CGO_ENABLED="1"; go build -o go-browser-inventory```
+   Non-Windows:
+    ```CGO_ENABLED=1; go build -o go-browser-inventory```
     
    This creates an executable named `go-browser-inventory` (or `go-browser-inventory.exe` on Windows).
 
@@ -98,6 +105,10 @@ Run the tool from the `go-browser-inventory` directory or anywhere if added to y
     
    Adds detailed logs for troubleshooting (e.g., file paths scanned, message resolution steps).
 
+- **Update Cache**:
+    
+    ./go-browser-inventory -update-cache
+
 - **Combine flags**:
     
     ./go-browser-inventory -browser chrome -json -debug
@@ -111,6 +122,7 @@ Run the tool from the `go-browser-inventory` directory or anywhere if added to y
 ### Flags
 - `-browser <name>`: Filter by browser (chrome, edge, firefox). Default: all browsers.
 - `-json`: Output in JSON instead of console format. Default: false.
+- `-update-cache`: Force update of database records, bypassing cache. Default: false.
 - `-debug`: Enable debug logging. Default: false.
 - `-help`: Show help information.
 
@@ -118,6 +130,8 @@ Run the tool from the `go-browser-inventory` directory or anywhere if added to y
     
     go-browser-inventory/
     ├── main.go              # Entry point and CLI logic
+    ├── db/
+    |   ├──db.go             # DB configuration and tools
     ├── internal/
     │   ├── browsers/
     │   │   ├── structs.go   # Type definitions (Extension, BrowserConfig, etc.)
@@ -127,8 +141,9 @@ Run the tool from the `go-browser-inventory` directory or anywhere if added to y
     ├── go.mod               # Go module definition
     ├── README.md            # This file
 
-- **`main.go`**: Handles command-line flags and output formatting.
+- **`main.go`**: Handles command-line flags, caching and output formatting.
 - **`internal/browsers/`**: Contains all browser-specific logic and types, kept internal to prevent external imports.
+- **`db/`**: Contains DB configuration and controls.
 
 ## How It Works
 - Scans default profile directories for Chrome, Edge, and Firefox.
