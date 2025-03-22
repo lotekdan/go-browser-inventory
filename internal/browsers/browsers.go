@@ -106,14 +106,14 @@ func (bi *BrowserInventory) GetExtensions(selectedBrowser string, debug bool) ([
 }
 
 // resolveMessage handles __MSG_ placeholders for extension names
-// resolveMessage handles __MSG_ placeholders for extension names
 func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
 	msgKey := strings.TrimPrefix(msg, "__MSG_")
 	msgKey = strings.TrimSuffix(msgKey, "__")
-	lookupKey := strings.ToLower(msgKey)
+	lookupKey := strings.ToLower(msgKey) // Lowercase for consistency
+	lookupKeyOriginal := msgKey          // Original case for exact match
 	localesPath := filepath.Join(basePath, "_locales")
 	if debug {
-		fmt.Printf("Debug: Resolving %s, lookupKey: %s, basePath: %s\n", msgKey, lookupKey, basePath)
+		fmt.Printf("Debug: Resolving %s, lookupKey: %s, lookupKeyOriginal: %s, basePath: %s\n", msgKey, lookupKey, lookupKeyOriginal, basePath)
 	}
 
 	if _, err := os.Stat(localesPath); os.IsNotExist(err) {
@@ -141,15 +141,24 @@ func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
 			if err := json.Unmarshal(data, &messages); err == nil {
 				if debug {
 					fmt.Printf("Debug: Parsed %s, keys: %v\n", messagesPath, reflect.ValueOf(messages).MapKeys())
-					fmt.Printf("Debug: Checking for key %s in map: %v\n", lookupKey, messages)
+					fmt.Printf("Debug: Checking for key %s (original) and %s (lowercase) in map: %v\n", lookupKeyOriginal, lookupKey, messages)
 				}
-				if val, ok := messages[lookupKey]; ok {
+				// Try original case first
+				if val, ok := messages[lookupKeyOriginal]; ok {
 					if debug {
-						fmt.Printf("Resolved %s to %s from %s (default locale)\n", msgKey, val.Message, messagesPath)
+						fmt.Printf("Resolved %s to %s from %s (default locale, original case)\n", msgKey, val.Message, messagesPath)
 					}
 					return val.Message
-				} else if debug {
-					fmt.Printf("Note: Key %s (lookup: %s) not found in %s (default locale)\n", msgKey, lookupKey, messagesPath)
+				}
+				// Then try lowercase
+				if val, ok := messages[lookupKey]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s (default locale, lowercase)\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				}
+				if debug {
+					fmt.Printf("Note: Key %s (lookup: %s or %s) not found in %s (default locale)\n", msgKey, lookupKeyOriginal, lookupKey, messagesPath)
 				}
 			} else if debug {
 				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
@@ -172,15 +181,24 @@ func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
 			if err := json.Unmarshal(data, &messages); err == nil {
 				if debug {
 					fmt.Printf("Debug: Parsed %s, keys: %v\n", messagesPath, reflect.ValueOf(messages).MapKeys())
-					fmt.Printf("Debug: Checking for key %s in map: %v\n", lookupKey, messages)
+					fmt.Printf("Debug: Checking for key %s (original) and %s (lowercase) in map: %v\n", lookupKeyOriginal, lookupKey, messages)
 				}
-				if val, ok := messages[lookupKey]; ok {
+				// Try original case first
+				if val, ok := messages[lookupKeyOriginal]; ok {
 					if debug {
-						fmt.Printf("Resolved %s to %s from %s (English fallback)\n", msgKey, val.Message, messagesPath)
+						fmt.Printf("Resolved %s to %s from %s (English fallback, original case)\n", msgKey, val.Message, messagesPath)
 					}
 					return val.Message
-				} else if debug {
-					fmt.Printf("Note: Key %s (lookup: %s) not found in %s (English fallback)\n", msgKey, lookupKey, messagesPath)
+				}
+				// Then try lowercase
+				if val, ok := messages[lookupKey]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s (English fallback, lowercase)\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				}
+				if debug {
+					fmt.Printf("Note: Key %s (lookup: %s or %s) not found in %s (English fallback)\n", msgKey, lookupKeyOriginal, lookupKey, messagesPath)
 				}
 			} else if debug {
 				fmt.Printf("Warning: Failed to parse %s: %v\n", messagesPath, err)
@@ -201,9 +219,15 @@ func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
 				Message string `json:"message"`
 			}
 			if err := json.Unmarshal(data, &messages); err == nil {
+				if val, ok := messages[lookupKeyOriginal]; ok {
+					if debug {
+						fmt.Printf("Resolved %s to %s from %s (other locale, original case)\n", msgKey, val.Message, messagesPath)
+					}
+					return val.Message
+				}
 				if val, ok := messages[lookupKey]; ok {
 					if debug {
-						fmt.Printf("Resolved %s to %s from %s\n", msgKey, val.Message, messagesPath)
+						fmt.Printf("Resolved %s to %s from %s (other locale, lowercase)\n", msgKey, val.Message, messagesPath)
 					}
 					return val.Message
 				}
@@ -212,7 +236,7 @@ func resolveMessage(msg, basePath, defaultLocale string, debug bool) string {
 	}
 
 	if debug {
-		fmt.Printf("Note: No matching message found for %s (lookup: %s) in %s\n", msgKey, lookupKey, localesPath)
+		fmt.Printf("Note: No matching message found for %s (lookup: %s or %s) in %s\n", msgKey, lookupKeyOriginal, lookupKey, localesPath)
 	}
 	return msgKey
 }
