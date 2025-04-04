@@ -2,25 +2,16 @@ package debug
 
 import (
 	"log"
-	"os"
 )
 
-var enabled bool
+var debugEnabled = false
 
-// Enable turns on debug logging to stderr.
-func Enable() {
-	enabled = true
-	log.SetOutput(os.Stderr)
+func SetEnabled(enabled bool) {
+	debugEnabled = enabled
 }
 
-// Disable turns off debug logging.
-func Disable() {
-	enabled = false
-}
-
-// Printf logs the message if debugging is enabled.
 func Printf(format string, v ...interface{}) {
-	if enabled {
+	if debugEnabled {
 		log.Printf(format, v...)
 	}
 }

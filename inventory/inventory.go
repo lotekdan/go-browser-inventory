@@ -16,21 +16,26 @@ type Inventory struct {
 	Total      int                `json:"total"`
 }
 
+// SetDebug enables or disables debug logging
+func SetDebug(enabled bool) {
+	debug.SetEnabled(enabled)
+}
+
 func Generate(outputPath string, browserFilter []string, jsonOutput bool) error {
 	browserList := []browsers.Browser{
 		&browsers.Chrome{},
 		&browsers.Firefox{},
+		&browsers.Brave{},
+		&browsers.Edge{},
 	}
 
-	// Convert filter to a map for efficient lookup
 	filterMap := make(map[string]bool)
 	for _, b := range browserFilter {
-		filterMap[b] = true
+		filterMap[strings.ToLower(b)] = true
 	}
 
 	var allExtensions []models.Extension
 	for _, browser := range browserList {
-		// Skip if filter is set and browser isn’t in it
 		if len(filterMap) > 0 && !filterMap[browser.Name()] {
 			continue
 		}
@@ -46,20 +51,18 @@ func Generate(outputPath string, browserFilter []string, jsonOutput bool) error 
 			debug.Printf("Error getting extensions for %s: %v", browser.Name(), err)
 			continue
 		}
-		for _, ext := range exts {
-			ext.Browser = browser.Name()
-			allExtensions = append(allExtensions, ext)
-		}
+		allExtensions = append(allExtensions, exts...)
 	}
 
 	extMap := make(map[string]models.Extension)
 	for _, ext := range allExtensions {
-		if existing, ok := extMap[ext.ID]; ok {
+		key := ext.ID + "_" + ext.Browser
+		if existing, ok := extMap[key]; ok {
 			if compareVersions(ext.Version, existing.Version) > 0 {
-				extMap[ext.ID] = ext
+				extMap[key] = ext
 			}
 		} else {
-			extMap[ext.ID] = ext
+			extMap[key] = ext
 		}
 	}
 

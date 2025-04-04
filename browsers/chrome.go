@@ -21,15 +21,15 @@ func (c *Chrome) Detect() bool {
 }
 
 func (c *Chrome) Extensions() ([]models.Extension, error) {
-	return getChromiumExtensions(config.ChromeExtensionsPath())
+	return getChromiumExtensions(config.ChromeExtensionsPath(), "chrome")
 }
 
-func getChromiumExtensions(extDir string) ([]models.Extension, error) {
+func getChromiumExtensions(extDir, browserName string) ([]models.Extension, error) {
 	if extDir == "" {
-		debug.Printf("Extension directory is empty for Chromium browser")
+		debug.Printf("Extension directory is empty for %s", browserName)
 		return nil, nil
 	}
-	debug.Printf("Scanning Chromium extensions in: %s", extDir)
+	debug.Printf("Scanning %s extensions in: %s", browserName, extDir)
 
 	var extensions []models.Extension
 	err := filepath.Walk(extDir, func(path string, info os.FileInfo, err error) error {
@@ -38,7 +38,6 @@ func getChromiumExtensions(extDir string) ([]models.Extension, error) {
 			return nil
 		}
 		if info.IsDir() || filepath.Base(path) != "manifest.json" {
-			debug.Printf("Skipping non-manifest file or directory: %s", path)
 			return nil
 		}
 
@@ -65,21 +64,37 @@ func getChromiumExtensions(extDir string) ([]models.Extension, error) {
 		}
 		extID := parts[len(parts)-2]
 		if len(extID) != 32 {
-			debug.Printf("Skipping invalid extension ID in %s: %s", path, extID)
 			return nil
 		}
 
 		name := manifest.Name
-		if name == "" || strings.HasPrefix(name, "__MSG_") {
-			// Try to resolve __MSG_ from locales
+		if strings.HasPrefix(name, "__MSG_") {
 			msgKey := strings.TrimSuffix(strings.TrimPrefix(name, "__MSG_"), "__")
 			localePath := filepath.Join(filepath.Dir(path), "_locales", "en", "messages.json")
 			if resolvedName, ok := getMessageName(localePath, msgKey); ok {
 				name = resolvedName
 			} else {
-				name = extID
-				debug.Printf("Using fallback name for %s: %s (original: %s)", path, name, manifest.Name)
+				localeDir := filepath.Join(filepath.Dir(path), "_locales")
+				dirs, err := os.ReadDir(localeDir)
+				if err == nil {
+					for _, dir := range dirs {
+						if dir.IsDir() && dir.Name() != "en" {
+							localePath = filepath.Join(localeDir, dir.Name(), "messages.json")
+							if resolvedName, ok := getMessageName(localePath, msgKey); ok {
+								name = resolvedName
+								break
+							}
+						}
+					}
+				}
+				if strings.HasPrefix(name, "__MSG_") {
+					name = extID // Final fallback
+					debug.Printf("Using fallback name for %s: %s (original: %s)", path, name, manifest.Name)
+				}
 			}
+		} else if name == "" {
+			name = extID
+			debug.Printf("Using fallback name for %s: %s (no name in manifest)", path, name)
 		}
 
 		debug.Printf("Found valid extension: ID=%s, Name=%s, Version=%s", extID, name, manifest.Version)
@@ -87,7 +102,8 @@ func getChromiumExtensions(extDir string) ([]models.Extension, error) {
 			ID:      extID,
 			Name:    name,
 			Version: manifest.Version,
-			Enabled: true, // Chrome doesn’t provide this in manifest; assume true
+			Enabled: true, // Chromium assumes enabled unless disabled via policy
+			Browser: browserName,
 		})
 		return nil
 	})
@@ -112,7 +128,7 @@ func getMessageName(localePath, key string) (string, bool) {
 		return "", false
 	}
 
-	if msg, ok := messages[key]; ok {
+	if msg, ok := messages[key]; ok && msg.Message != "" {
 		return msg.Message, true
 	}
 	return "", false
